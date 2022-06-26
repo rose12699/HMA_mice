@@ -1,0 +1,139 @@
+top20otus.H = names(sort(taxa_sums(ps.H2), TRUE)[1:500])
+taxtab20.H = cbind(tax_table(ps.H2), phylum20 = NA)
+taxtab20.H[top20otus.C, "phylum20"] <- as(tax_table(ps.H2)[top20otus.H, "Phylum"], "character")
+tax_table(ps.H2) <- tax_table(taxtab20.H)
+
+#ps.C2m = merge_samples(ps.H2, "TandT")
+ps.C2g <- tax_glom(ps.H2, "Phylum")
+
+sample_data(ps.C2g)$TandT <- levels(sample_data(ps.H2)$TandT)
+
+ps.C2g = transform_sample_counts(ps.C2g, function(x) 100 * x/sum(x))
+ps.C2mtop = prune_taxa(top20otus.C, ps.C2g)
+plot_bar(ps.C2mtop, "Sample", fill = "Phylum") + ylab("Relative Abundance") + scale_fill_brewer(palette="Set2") + ylim(0, 100)
+
+H2_glom_phy<-tax_glom(ps.H3,taxrank="Genus")
+H2_glom_phy.trans<-transform_sample_counts(H2_glom_phy,function(x) x/sum(x))
+H2_glom_phy.trans<-psmelt(H2_glom_phy.trans)
+H2_glom_phy.trans$Genus <- as.character(H2_glom_phy.trans$Genus)
+
+H2_glom_phy.trans$Genus[H2_glom_phy.trans$Abundance < 0.02] <- "<2% abun."
+H2_glom_phy.trans$Genus <- reorder(H2_glom_phy.trans$Genus, -H2_glom_phy.trans$Abundance)
+
+p<- ggplot(H2_glom_phy.trans, aes(x=Sample, y = Abundance, fill = Genus)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + 
+  guides(fill = guide_legend(ncol = 2)) +
+  ylab("Relative Abundance")
+
+
+H2_glom_fam<-tax_glom(ps.H2,taxrank="Family")
+H2_glom_fam.trans<-transform_sample_counts(H2_glom_fam,function(x) x/sum(x))
+H2_glom_fam.trans<-psmelt(H2_glom_fam.trans)
+H2_glom_fam.trans$Family <- as.character(H2_glom_fam.trans$Family)
+H2_glom_fam.trans$Family[H2_glom_fam.trans$Abundance < 0.02] <- "All others (1-2%)"
+H2_glom_fam.trans$Family[H2_glom_fam.trans$Abundance < 0.05] <- "<5% abun."
+H2_glom_fam.trans$Family <- reorder(H2_glom_fam.trans$Family, -H2_glom_fam.trans$Abundance)
+
+p<-ggplot(H2_glom_fam.trans, aes(x=Sample, y = Abundance, fill = Family)) +
+  geom_bar(stat = "identity")  + 
+  theme_bw() + scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),legend.text=element_text(size=8),
+        legend.title = element_blank())+
+  guides(fill = guide_legend(ncol = 2))+
+  ylab("Relative Abundance")
+
+
+
+##p<-data %>%
+  ##mutate(Sample = fct_relevel(Sample, "BH02Dec2020", "BH03Dec2020", "BH04Dec2020", "BH05Dec2020","BH06Dec2020","BH07Dec2020","BH08Dec2020","BH09Dec2020","BH10Dec2020","BH12Dec2020","BH13Dec2020","BH14Dec2020","BH15Dec2020","BH16Dec2020","BH17Dec2020","BH18Dec2020","BH19Dec2020","HF01Dec2020","HF02Dec2020","AH01Dec2020","AH02Dec2020", "AH03Dec2020", "AH04Dec2020", "AH05Dec2020","AH06Dec2020","AH07Dec2020","AH08Dec2020","AH09Dec2020","AH10Dec2020","AH1Dec2020","AH12Dec2020","AH13Dec2020","AH14Dec2020","AH15Dec2020","AH16Dec2020","AH17Dec2020","AH18Dec2020","AH19Dec2020","AH20Dec2020")) %>%
+  ##ggplot(H2_glom_fam.trans, aes(x=Sample, y = Abundance, fill = Family)) +
+   ## geom_bar(stat = "identity")  + 
+  ##  theme_bw() + scale_fill_manual(values = c25) +
+    ##theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),axis.title.x = element_blank(),legend.text=element_text(size=8),legend.title = element_blank())+
+    ##guides(fill = guide_legend(ncol = 2))+
+  ##  ylab("Relative Abundance")
+ps.C1<-subset_samples(ps,exp=="Cheeseexp")
+ps.C2<-subset_samples(ps.C1, Time!="Day7")
+ps.Csup<-subset_samples(ps,TandT=="Chee_sup")
+ps.newC<-merge_phyloseq(ps.C2, ps.Csup)
+
+C2H_glom_phy<-tax_glom(ps.newC,taxrank="Phylum")
+
+C2H_glom_phy.trans<-transform_sample_counts(C2H_glom_phy,function(x) x/sum(x))
+C2H_glom_phy.trans<-psmelt(C2H_glom_phy.trans)
+C2H_glom_phy.trans$Phylum <- as.character(C2H_glom_phy.trans$Phylum)
+C2H_glom_phy.trans$Phylum[C2H_glom_phy.trans$Abundance < 0.02] <- "<2% abun."
+C2H_glom_phy.trans$Phylum <- reorder(C2H_glom_phy.trans$Phylum, -C2H_glom_phy.trans$Abundance)
+
+p<- ggplot(C2H_glom_phy.trans, aes(x=Sample, y = Abundance, fill = Phylum)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_brewer(palette="Set2") +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + 
+  guides(fill = guide_legend(ncol = 1)) +
+  ylab("Relative Abundance")
+
+
+
+C2_glom_fam<-tax_glom(ps.C2_H,taxrank="Family")
+C2_glom_fam.trans<-transform_sample_counts(C2_glom_fam,function(x) x/sum(x))
+C2_glom_fam.trans<-psmelt(C2_glom_fam.trans)
+C2_glom_fam.trans$Family <- as.character(C2_glom_fam.trans$Family)
+C2_glom_fam.trans$Family[C2_glom_fam.trans$Abundance < 0.02] <- "<2% abun."
+C2_glom_fam.trans$Family <- reorder(C2_glom_fam.trans$Family, -C2_glom_fam.trans$Abundance)
+
+p<- ggplot(C2_glom_fam.trans, aes(x=Sample, y = Abundance, fill = Family)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + 
+  guides(fill = guide_legend(ncol = 1)) +
+  ylab("Relative Abundance")
+
+
+C2_glom_gen<-tax_glom(ps.newC,taxrank="Genus")
+C2_glom_gen.trans<-transform_sample_counts(C2_glom_gen,function(x) x/sum(x))
+C2_glom_gen.trans<-psmelt(C2_glom_gen.trans)
+C2_glom_gen.trans$Genus <- as.character(C2_glom_gen.trans$Genus)
+C2_glom_gen.trans$Genus[C2_glom_gen.trans$Abundance < 0.02] <- "<2% abun."
+C2_glom_gen.trans$Genus <- reorder(C2_glom_gen.trans$Genus, -C2_glom_gen.trans$Abundance)
+
+p<- ggplot(C2_glom_gen.trans, aes(x=Sample, y = Abundance, fill = Genus)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + 
+  guides(fill = guide_legend(ncol = 1)) +
+  ylab("Relative Abundance")
+
+
+ps.C1<-subset_samples(ps,exp=="Cheeseexp")
+ps.C2<-subset_samples(ps.C1, Time!="Day7")
+prop.C <- transform_sample_counts(ps.C2, function(otu) otu/sum(otu))
+ord.pcoa.bray <- ordinate(prop.C, method="NMDS", distance="bray")
+p5 = plot_ordination(prop.C, ord.pcoa.bray, color="Treatment", shape="Time")
+p5+ stat_ellipse(level=0.8)+theme(legend.title=element_text(size=12),legend.text = element_text(size=11))
+
+miseq.merge.BC.dist<-phyloseq::distance(ps.C2,method="bray")
+mm.BC.df<-data.frame(sample_data(ps.C2))
+adonis(miseq.merge.BC.dist ~ Time,data=mm.BC.df)
+pair=pairwise.adonis(otu_table(ps.C2),mm.BC.df$TandT)
+write.csv(pair,"C:\\Users\\SS\\Documents\\007Lab\\mice\\figuer\\good\\re-run\\H_pairwise_sig.csv", row.names = FALSE)
+
+
+
+mm.BC.df<-data.frame(sample_data(ps.H2))
+pair=pairwise.adonis(otu_table(ps.H2),mm.BC.df$TandT)
+write.csv(pair,"C:\\Users\\SS\\Documents\\007Lab\\mice\\figuer\\good\\re-run\\C_pairwise_sig.csv", row.names = FALSE)
