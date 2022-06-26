@@ -1,0 +1,125 @@
+library(dada2)
+
+R.Version()
+#"R version 4.1.0 (2021-05-18)"
+packageVersion("dada2")
+#1.20.0
+path <- "C:/Users/User/Documents/ss/fastqfiles" # CHANGE ME to the directory 
+# extract files
+list.files(path)
+fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
+setwd(path)
+sampleNames <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) # Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+
+#any(duplicated(sample.names))
+
+#Inspect read quality profiles
+plotQualityProfile(fnFs[1:2])
+plotQualityProfile(fnRs[1:2])
+
+
+#Filter and trim
+filt_path <- file.path(path, "filtered") # Place filtered files in filtered/ subdirectory
+if(!file_test("-d", filt_path)) dir.create(filt_path)
+filtFs <- file.path(filt_path, paste0(sampleNames, "_F_filt.fastq.gz"))
+filtRs <- file.path(filt_path, paste0(sampleNames, "_R_filt.fastq.gz"))
+#any(duplicated(c(fnFs, fnRs)))
+#any(duplicated(c(filtFs, filtRs)))
+#length(fnFs) == length(fnRs)
+
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
+                     maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
+                     compress=TRUE, multithread=FALSE) # On Windows set multithread=FALSE
+head(out)
+
+#dereplication and Learn the Error Rates
+errF <- learnErrors(filtFs, multithread=TRUE)
+#115986000 total bases in 483275 reads from 11 samples will be used for learning the error rates
+errR <- learnErrors(filtRs, multithread=TRUE)
+#106534560 total bases in 665841 reads from 14 samples will be used for learning the error rates.
+
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+
+derepFs <- derepFastq(filtFs, verbose=TRUE) 
+derepRs <- derepFastq(filtRs, verbose=TRUE)
+names(derepFs) <- sampleNames
+names(derepRs) <- sampleNames
+
+
+#Sample Inference
+dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
+dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
+dadaFs[[1]]
+#dada-class: object describing DADA2 denoising results
+#226 sequence variants were inferred from 6315 input unique sequences.
+#Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+
+#Merge paired reads
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
+## Inspect the merger data.frame from the first sample
+head(mergers[[1]])
+
+#Construct sequence table
+seqtab <- makeSequenceTable(mergers)
+table(nchar(getSequences(seqtab)))
+dim(seqtab)
+
+#Remove chimeras
+seqtab.nochim <- removeBimeraDenovo(seqtab,method="consensus", multithread=TRUE, verbose = TRUE)
+#Identified 2291 bimeras out of 3022 input sequences
+dim(seqtab.nochim) #131 731
+sum(seqtab.nochim)/sum(seqtab) #0.8504257
+save(seqtab.nochim, file="seqtab.nochim.RData")
+
+
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+# If processing a single sample, remove the sapply calls: e.g. replace sapply(dadaFs, getN) with getN(dadaFs)
+colnames(track) <- c("input", "filtered", "denoised", "tabled", "merged", "nonchim")
+rownames(track) <- sampleNames
+head(track)
+save(track, file="track.RData")
+colSums(track)
+
+
+#Assign taxonomy
+
+taxa <- assignTaxonomy(seqtab.nochim, "silva_nr99_v138.1_train_set.fa.gz", multithread=TRUE)
+
+
+taxa.print<-taxa
+rownames(taxa.print)<-NULL
+head(taxa.print)
+save(taxa, file = "genus.RData")
+
+taxa<-as.data.frame(taxa)
+taxa1<-taxa[taxa$Kingdom %in% "Bacteria",]
+taxa2<-taxa1[!taxa1$Family %in% "Mitochondria",]
+taxa3<-taxa2[!taxa2$Order %in% "Chloroplast",]
+taxa4<-as.matrix(taxa3)
+save(taxa4, file = "taxa.sequence.RData")
+
+
+samdf<-read.csv("sample_summary.csv") %>% as_tibble()%>% mutate(newid=paste(Sample_ID,"Dec2020",sep=""))
+samdf<-as.data.frame(samdf)
+rownames(samdf)<-samdf$newid
+View(samdf)
+library(phyloseq)
+
+ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
+               sample_data(samdf), 
+               tax_table(taxa4))
+
+#save exact sequences and short names to ASV
+dna <- Biostrings::DNAStringSet(taxa_names(ps))
+names(dna) <- taxa_names(ps)
+ps <- merge_phyloseq(ps, dna)
+taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
+ps
+
+save(ps, file = "phyloseq.RData")
+
+###packageVersion("phyloseq") 
+##1.34.0
