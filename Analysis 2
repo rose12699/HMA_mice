@@ -1,0 +1,98 @@
+ps.C<-subset_samples(ps,exp=="Cheeseexp")
+ps.C<-subset_samples(ps.C, TandT!="Cheesefeed")
+ps.C<-subset_samples(ps.C, TandT!="Controlfeed")
+ps.Ca<-subset_samples(ps.C, TandT!="Chee_sup")
+ps.Ca<-subset_samples(ps.C, Time!="Day7")
+ps.Ca
+View(ps.Ca)
+merge.Ca<-merge_samples(ps.Ca, "TandT")
+ps.glom.phyla<-tax_glom(merge.Ca,taxrank="Phylum")
+ps.glom.phyla.trans<-transform_sample_counts(ps.glom.phyla,function(x) x/sum(x))
+ps.glom.ph.melt<-psmelt(ps.glom.phyla.trans)
+ps.glom.ph.melt$Phylum <- as.character(ps.glom.ph.melt$Phylum)
+ps.glom.ph.melt$Phylum[ps.glom.ph.melt$Abundance < 0.01] <- "<1% abun."
+ps.glom.ph.melt$Phylum <- reorder(ps.glom.ph.melt$Phylum, -ps.glom.ph.melt$Abundance)
+ps.glom.ph.melt$Sample<-factor(ps.glom.ph.melt$Sample, c("Beforefeeding","Wk6_Control","Wk6_Cheese"))
+
+library(RColorBrewer)
+
+ps.glom.phyla.trans.bar <- ggplot(ps.glom.ph.melt, aes(x=Sample, y = Abundance, fill = Phylum)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_brewer(palette = "Accent") +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + guides(fill = guide_legend(ncol = 2))+
+  ylab("Relative Abundance")
+ps.glom.phyla.trans.bar
+write.csv(ps.glom.ph.melt,"C:/Users/SS/OneDrive/Documents/microbiome/Cheese_phylum.csv", row.names = FALSE)
+
+
+
+ps.glom.f<-tax_glom(merge.Ca,taxrank="Family")
+ps.glom.f.trans<-transform_sample_counts(ps.glom.f,function(x) x/sum(x))
+ps.glom.f.melt<-psmelt(ps.glom.f.trans)
+ps.glom.f.melt$Family <- as.character(ps.glom.f.melt$Family)
+ps.glom.f.melt$Family[ps.glom.f.melt$Abundance < 0.01] <- "<1% abun."
+ps.glom.f.melt$Family <- reorder(ps.glom.f.melt$Family, -ps.glom.f.melt$Abundance)
+ps.glom.f.melt$Sample<-factor(ps.glom.f.melt$Sample, c("Beforefeeding","Wk6_Control","Wk6_Cheese"))
+
+ps.glom.f.trans.bar <- ggplot(ps.glom.f.melt, aes(x=Sample, y = Abundance, fill = Family)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + guides(fill = guide_legend(ncol = 2))+
+  ylab("Relative Abundance")
+ps.glom.f.trans.bar
+write.csv(ps.glom.f.melt,"C:/Users/SS/OneDrive/Documents/microbiome/Cheese_family.csv", row.names = FALSE)
+
+
+
+ps.glom.g<-tax_glom(merge.Ca,taxrank="Genus")
+ps.glom.g.trans<-transform_sample_counts(ps.glom.g,function(x) x/sum(x))
+ps.glom.g.melt<-psmelt(ps.glom.g.trans)
+ps.glom.g.melt$Genus <- as.character(ps.glom.g.melt$Genus)
+ps.glom.g.melt$Genus[ps.glom.g.melt$Abundance < 0.01] <- "<1% abun."
+ps.glom.g.melt$Genus <- reorder(ps.glom.g.melt$Genus, -ps.glom.g.melt$Abundance)
+ps.glom.g.melt$Sample<-factor(ps.glom.g.melt$Sample, c("Beforefeeding","Wk6_Control","Wk6_Cheese"))
+
+ps.glom.g.trans.bar <- ggplot(ps.glom.g.melt, aes(x=Sample, y = Abundance, fill = Genus)) +
+  geom_bar(stat = "identity")  + theme_bw() + 
+  scale_fill_manual(values = c25) +
+  theme(axis.text.x = element_text(vjust=0.5, size=10, angle = 270),
+        axis.title.x = element_blank(),
+        legend.text=element_text(size=8),
+        legend.title = element_blank()) + guides(fill = guide_legend(ncol = 2))+
+  ylab("Relative Abundance")
+ps.glom.g.trans.bar
+write.csv(ps.glom.g.melt,"C:/Users/SS/OneDrive/Documents/microbiome/Cheese_genus.csv", row.names = FALSE)
+
+
+library("DESeq2")
+#deseq2
+ps.Ca2=subset_samples(ps.Ca, TandT !="Beforefeeding")
+ps.Ca2.f<-prune_taxa(taxa_sums(ps.Ca2)>0, ps.Ca2)
+otu_table(ps.Ca2.f) <- otu_table(ps.Ca2.f) + 1
+deseq = phyloseq_to_deseq2(ps.Ca2.f, ~TandT)
+deseq = DESeq(deseq, test="Wald", fitType="parametric")
+res = results(deseq, cooksCutoff = FALSE)
+
+alpha = 0.1
+sigtab = res[which(res$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(ps.Ca2.f)[rownames(sigtab), ], "matrix"))
+head(sigtab)
+dim(sigtab)
+
+x = tapply(sigtab$log2FoldChange, sigtab$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtab$Phylum = factor(as.character(sigtab$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtab$log2FoldChange, sigtab$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtab$Genus = factor(as.character(sigtab$Genus), levels=names(x))
+sigtab = subset(sigtab,sigtab$Genus !="NA")
+ggplot(sigtab, aes(x=-log2FoldChange, y=Genus, color=Phylum)) +
+  theme_bw() +
+  geom_point(size=2) 
