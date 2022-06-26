@@ -1,0 +1,118 @@
+#load pyloseq and metadata
+library(microbiome)
+ps<-prune_samples(sample_sums(ps)>0, ps)
+#55color
+c25 <- c(
+  "coral2", "paleturquoise1", "gold1",
+  "skyblue2", "#FB9A99", # lt pink 
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2","dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "maroon", "orchid1", "slateblue1", "deeppink1", "lightsteelblue1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown", "navy", "oldlace", "turquoise1", "tomato2", "thistle4",
+  "darkgoldenrod3", "lavender", "darkcyan", "aquamarine", "antiquewhite2", 
+  "darkviolet", "honeydew1", "mediumorchid3", "navajowhite3", "yellowgreen", "darkkhaki", 
+  "snow1", "salmon", "magenta", "black", "lightpink3", "darkseagreen1", "dodgerblue4"
+)
+
+#Humanity_alpha
+
+ps.H1<-subset_samples(ps,exp=="Humanization")
+ps.H2<-subset_samples(ps.H1, Time!="D7")
+#library(ggsignif)
+p = plot_richness(ps.H2, x="TandT", measures=c("Chao1"), color="TandT") + geom_boxplot() +
+  theme(axis.title=element_blank(),axis.text.x = element_text(angle = -45),legend.position = "none") +  
+  geom_signif(comparisons = list(c("Day0_Humanization", "Day14_Humanization"),c("Day0_Humanization", "Human feces"),
+  c("Day14_Humanization", "Human feces")), map_signif_level=TRUE,step_increase = 0.1,color = "black")
+
+
+#Cheesefeeding_alpha
+
+ps.C1<-subset_samples(ps,exp=="Cheeseexp")
+ps.C2<-subset_samples(ps.C1, Time!="Day7")
+p2 = plot_richness(ps.C2, x="TandT", measures=c("Chao1", "observed", "Shannon", "Simpson"), color="TandT")+ geom_boxplot() +
+  theme(axis.title=element_blank(),axis.text.x = element_text(angle = -45),legend.position = "none") + 
+  geom_signif(comparisons = list(c("Beforefeeding", "Wk6_Control"), c("Beforefeeding", "Wk6_Cheese"), c("Wk6_Control", "Wk6_Cheese")), 
+  map_signif_level=TRUE,step_increase = 0.1,color = "black")
+  
+#########beta diversity humanization
+
+prop.H <- transform_sample_counts(ps.H2, function(otu) otu/sum(otu))
+
+ord.pcoa.bray <- ordinate(prop.H, method="PCoA", distance="bray")
+###ord.pcoa <- ordinate(prop.H, method="PCoA", "unifrac", weighted=TRUE, distance="bray")
+p3 = plot_ordination(prop.H, ord.pcoa.bray, color="Time")
+p$data$Time <- as.character(p$data$Time)
+p$data$Time <- factor(p$data$Time, levels=c("D0","D14","Human feces"))
+
+p4 = p3 + 
+  theme(legend.title=element_text(size=12),legend.text = element_text(size=11)) + 
+  ylab("PCoA 1 (7.9%)") + 
+  xlab("PCoA 2 (75.3%)")
+#library(devtools)
+
+ps.H3<-subset_samples(ps.H2, TandT!="Human feces")
+prop.H3 <- transform_sample_counts(ps.H3, function(otu) otu/sum(otu))
+ord.pcoa.bray3 <- ordinate(prop.H3, method="PCoA", distance="bray")
+pH3 = plot_ordination(prop.H3, ord.pcoa.bray3, color="Time")
+pH3+ 
+  theme(legend.title=element_text(size=12),legend.text = element_text(size=11)) + 
+  ylab("PCoA 1 (4.9%)") + 
+  xlab("PCoA 2 (78%)")
+bray <- phyloseq::distance(prop.H3, method = "jaccard")
+# make a data frame from the sample_data
+sampledfH3 <- data.frame(sample_data(prop.H3))
+# Adonis test
+adonis(bray ~ Time, data = sampledfH3)
+#p=0.001
+
+
+#########beta diversity cheese feeding#########
+
+prop.C <- transform_sample_counts(ps.C2, function(otu) otu/sum(otu))
+ord.pcoa.bray <- ordinate(prop.C, method="PCoA", distance="bray")
+p5 = plot_ordination(prop.C, ord.pcoa.bray, color="Treatment", shape="Time")
+
+p6 = p5 + stat_ellipse(level=0.8) +
+  theme(legend.title=element_text(size=12),legend.text = element_text(size=11)) + 
+  ylab("PCoA 1 (44.3%)") + 
+  xlab("PCoA 2 (13.1%)")
+
+ps.C3<-subset_samples(ps.C1, Time=="Day42")
+prop.C2 <- transform_sample_counts(ps.C3, function(otu) otu/sum(otu))
+
+ord.pcoa.bray <- ordinate(prop.C2, method="PCoA", distance="bray")
+p7 = plot_ordination(prop.C2, ord.pcoa.bray, color="Treatment",shape="Time")
+p8 = p7 + stat_ellipse(level=0.8) +
+  theme(legend.title=element_text(size=12),legend.text = element_text(size=11)) + 
+  ylab("PCoA 1 (45%)") + 
+  xlab("PCoA 2 (13.1%)")
+
+#otu.C <- abundances(prop.C)
+#meta.C <- meta(prop.C)
+#library(vegan)
+#permanova <- adonis(t(otu.C) ~ Treatment,
+#                    data = meta.C, permutations=99, method = "bray")
+#print(as.data.frame(permanova$aov.tab)["Treatment", "Pr(>F)"])
+set.seed(1)
+# Calculate bray curtis distance matrix
+bray <- phyloseq::distance(prop.C2, method = "jaccard")
+# make a data frame from the sample_data
+sampledf <- data.frame(sample_data(prop.C2))
+# Adonis test
+adonis(bray ~ Treatment, data = sampledf)
+#p=0.003
+
+##using NMDS
+ord.NMDS.bray<- ordinate(prop.C2, "NMDS", "bray")
+p9 = plot_ordination(prop.C2, ord.NMDS.bray, color="Treatment",shape="Time") + 
+  stat_ellipse(level=0.8) + theme(legend.title=element_text(size=12),legend.text = element_text(size=11))
+
+miseq.merge.BC.dist<-phyloseq::distance(ps.C2,method="bray")
+mm.BC.df<-data.frame(sample_data(ps.C2))
+adonis(miseq.merge.BC.dist ~ Time,data=mm.BC.df)
