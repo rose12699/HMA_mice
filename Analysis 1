@@ -20,7 +20,7 @@ c25 <- c(
   "snow1", "salmon", "magenta", "black", "lightpink3", "darkseagreen1", "dodgerblue4"
 )
 
-#Humanity_alpha
+#Humanity_alpha diversity
 
 ps.H1<-subset_samples(ps,exp=="Humanization")
 ps.H2<-subset_samples(ps.H1, Time!="D7")
@@ -31,7 +31,7 @@ p = plot_richness(ps.H2, x="TandT", measures=c("Chao1"), color="TandT") + geom_b
   c("Day14_Humanization", "Human feces")), map_signif_level=TRUE,step_increase = 0.1,color = "black")
 
 
-#Cheesefeeding_alpha
+#Cheesefeeding_alpha diversity
 
 ps.C1<-subset_samples(ps,exp=="Cheeseexp")
 ps.C2<-subset_samples(ps.C1, Time!="Day7")
